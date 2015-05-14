@@ -29,6 +29,14 @@ class NetsuiteEndpoint < EndpointBase::Sinatra::Base
 
   before do
     if config = @config
+      # https://github.com/wombat/netsuite_integration/pull/27
+      # Set connection/flow parameters with environment variables if they aren't already set from the request
+      %w(email password account role sandbox api_version wsdl_url silent).each do |env_suffix|
+        if ENV["NETSUITE_#{env_suffix.upcase}"].present? && config["netsuite_#{env_suffix}"].nil?
+          config["netsuite_#{env_suffix}"] = ENV["NETSUITE_#{env_suffix.upcase}"]
+        end
+      end
+
       @netsuite_client ||= NetSuite.configure do
         reset!
 
