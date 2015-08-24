@@ -48,4 +48,12 @@ module NetsuiteIntegration
   class CreationFailCustomerRefundException < StandardError; end
 
   class NonInventoryItemException < StandardError; end
+
+  class UnmappableCustomBodyFieldException < StandardError
+    def initialize(msg=nil)
+      msg ||= 'Unable to map a custom body field name to an internal id and type.'\
+       ' Check your wombat flow parameter netsuite_custom_body_fields_map'
+      super
+    end
+  end
 end

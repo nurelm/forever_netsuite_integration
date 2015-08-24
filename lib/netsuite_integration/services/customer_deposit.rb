@@ -17,7 +17,9 @@ module NetsuiteIntegration
             unless deposit = find_by_external_id(external_id)
               deposit = build(sales_order, payment)
               result = deposit.add
-              
+
+              puts deposit.inspect #debug
+
               # Need to know if at least one of them was persisted
               @persisted ||= result
             end
