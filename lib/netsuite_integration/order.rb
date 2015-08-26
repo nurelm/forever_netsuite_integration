@@ -114,6 +114,16 @@ module NetsuiteIntegration
       end || {}
     end
 
+    # Returns true if the coupon code parameter was present in the request or a promotion code already exists
+    # This methods result will be used to alter discount item logic in build_item_list()
+    def has_promotion_code?
+      begin
+        return (!order_payload[:custom_fields][:netsuite_custbody]["coupon_code"].blank? or !sales_order.promo_code.internal_id.blank?)
+      rescue
+        return false
+      end
+    end
+
     # Method will organize and perform data processing on any custom body field data for the order object
     def handle_custom_body_fields
       custom_fields = order_payload[:custom_fields]
@@ -134,7 +144,7 @@ module NetsuiteIntegration
         # Attempt to find the field's internal_id and type in the fields map
         field_data = custom_body_fields_map[field_name].split(";;",2) rescue nil
         field_id,field_type = field_data
-        raise UnmappableCustomBodyFieldException if field_id.blank? or field_type.blank?
+        raise (UnmappableCustomBodyFieldException).new(nil,field_name) if field_id.blank? or field_type.blank?
 
         case field_type
         when "platformCore:SelectCustomFieldRef"
@@ -169,25 +179,25 @@ module NetsuiteIntegration
         sales_order.promo_code = promotion
       elsif coupon_results.count > 1
         # Found too many matching coupon codes in NetSuite
-        raise UnmappableCustomBodyFieldException # TODO: Better error message
+        raise (CouponCodeTooManyMatchesException).new(nil,coupon_code)
       else
         # Failed to find a matching coupon code in NetSuite
-        raise UnmappableCustomBodyFieldException  # TODO: Better error message
+        raise (CouponCodeNotFoundException).new(nil,coupon_code)
       end
     end
 
     def handle_select_custom_field_ref(field_id, field_type, field_name, field_value)
       # These custom body field types rely on selecting a value from a custom list, we need to gather this list's options
       # For now, the integration's order flow msut be configured with this data
-      # TODO: Update to allow finding these values with API requests (probably requires adding CustomList type to Netsuite::Records)
+      # TODO: Consider an update to allow finding these values with API requests (probably requires adding CustomList type to Netsuite::Records)
       po_field_id = custom_body_fields_map["#{field_name}_list_id"]
       po_list_map = custom_body_fields_map["#{field_name}_list_map"]
-      raise UnmappableCustomBodyFieldException if po_field_id.blank? or po_list_map.blank? # TODO: More specific error?
+      raise (MissingCustomSelectFieldInfoException).new(nil,field_name) if po_field_id.blank? or po_list_map.blank?
 
       po_list_map = Hash[po_list_map.split("||").map{ |i| i.split(";;",2) }] # Breaks if list_map string was formatted incorrectly
 
       po_selected_id = po_list_map[field_value] # Internal Id of selected option
-      raise UnmappableCustomBodyFieldException if po_selected_id.blank?
+      raise (MissingCustomSelectFieldInfoException).new(nil,field_name) if po_selected_id.blank?
 
       sales_order.custom_field_list.create_or_update_custom_field(field_id, field_type, [po_selected_id,po_field_id])
     end
@@ -240,21 +250,25 @@ module NetsuiteIntegration
         })
       end
 
-      # Due to NetSuite complexity, taxes and discounts will be treated as line items.
-      ["tax", "discount"].map do |type|
-        value = order_payload[:adjustments].sum do |hash|
-          if hash[:name].to_s.downcase == type.downcase
-            hash[:value]
-          else
-            0
+      # This section is redundant (and breaks NetSuite) if Promotion codes were handled by
+      # handle_promotion_code(), therefore skip it if we already have a Promotion Code
+      unless has_promotion_code?
+        # Due to NetSuite complexity, taxes and discounts will be treated as line items.
+        ["tax", "discount"].map do |type|
+          value = order_payload[:adjustments].sum do |hash|
+            if hash[:name].to_s.downcase == type.downcase
+              hash[:value]
+            else
+              0
+            end
           end
-        end
 
-        if value != 0
-          sales_order_items.push(NetSuite::Records::SalesOrderItem.new({
-            item: { internal_id: internal_id_for(type) },
-            rate: value
-          }))
+          if value != 0
+            sales_order_items.push(NetSuite::Records::SalesOrderItem.new({
+              item: { internal_id: internal_id_for(type) },
+              rate: value
+            }))
+          end
         end
       end
 
