@@ -250,25 +250,25 @@ module NetsuiteIntegration
         })
       end
 
-      # This section is redundant (and breaks NetSuite) if Promotion codes were handled by
-      # handle_promotion_code(), therefore skip it if we already have a Promotion Code
-      unless has_promotion_code?
-        # Due to NetSuite complexity, taxes and discounts will be treated as line items.
-        ["tax", "discount"].map do |type|
-          value = order_payload[:adjustments].sum do |hash|
-            if hash[:name].to_s.downcase == type.downcase
-              hash[:value]
-            else
-              0
-            end
-          end
+      # Due to NetSuite complexity, taxes and discounts will be treated as line items.
+      ["tax", "discount"].map do |type|
+        # This section is redundant (and breaks NetSuite) if Promotion codes were handled by
+        # handle_promotion_code(), therefore skip it if we already have a Promotion Code
+        next if has_promotion_code? and type == "discount"
 
-          if value != 0
-            sales_order_items.push(NetSuite::Records::SalesOrderItem.new({
-              item: { internal_id: internal_id_for(type) },
-              rate: value
-            }))
+        value = order_payload[:adjustments].sum do |hash|
+          if hash[:name].to_s.downcase == type.downcase
+            hash[:value]
+          else
+            0
           end
+        end
+
+        if value != 0
+          sales_order_items.push(NetSuite::Records::SalesOrderItem.new({
+            item: { internal_id: internal_id_for(type) },
+            rate: value
+          }))
         end
       end
 
