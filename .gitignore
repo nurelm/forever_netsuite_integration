@@ -6,3 +6,7 @@ spec/cassettes
 .vagrant/
 Vagrantfile
 bootstrap.sh
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
