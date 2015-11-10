@@ -4,7 +4,7 @@ module NetsuiteIntegration
       attr_reader :errors
 
       def find_or_create_by_name(name, extra_fields = {})
-        unless item = inventory_item_service.find_by_name(name)
+        unless item = inventory_item_service.find_by_exact_name(name)
           new_item = NetSuite::Records::NonInventorySaleItem.new(
             item_id: name,
             display_name: name,
@@ -15,7 +15,7 @@ module NetsuiteIntegration
 
           if new_item.add
             # unfortunately, we have to reload the object
-            item = inventory_item_service.find_by_name(name)
+            item = inventory_item_service.find_by_exact_name(name)
           else
             @errors = new_item.errors
           end
