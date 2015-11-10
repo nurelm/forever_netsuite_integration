@@ -20,7 +20,8 @@ module NetsuiteIntegration
         })
       else
         @sales_order = NetSuite::Records::SalesOrder.new({
-          order_status: '_pendingFulfillment',
+          # Normally status is set to '_pendingFulfillment' but Forever wants the default to be Pending Approval
+          order_status: '_pendingApproval',
           external_id: order_payload[:number] || order_payload[:id]
         })
 
@@ -223,7 +224,7 @@ module NetsuiteIntegration
     end
 
     def internal_id_for(type)
-      name = @config.fetch("netsuite_item_for_#{type.pluralize}", "Store #{type.capitalize}")
+      name = @config.fetch("netsuite_item_for_#{type.pluralize}", "Store #{type.gsub(/_/, ' ').capitalize}")
       if item = non_inventory_item_service.find_or_create_by_name(name, order_payload[:netsuite_non_inventory_fields])
         item.internal_id
       else
@@ -250,8 +251,9 @@ module NetsuiteIntegration
         })
       end
 
-      # Due to NetSuite complexity, taxes and discounts will be treated as line items.
-      ["tax", "discount"].map do |type|
+      # Due to NetSuite complexity, taxes, discounts, shipping, and shipping
+      # tax will be treated as line items.
+      ["tax", "discount", "shipping", "shipping_tax"].map do |type|
         # This section is redundant (and breaks NetSuite) if Promotion codes were handled by
         # handle_promotion_code(), therefore skip it if we already have a Promotion Code
         next if has_promotion_code? and type == "discount"
