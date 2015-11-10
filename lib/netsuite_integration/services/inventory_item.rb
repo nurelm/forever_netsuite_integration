@@ -38,6 +38,18 @@ module NetsuiteIntegration
         }).results.first
       end
 
+      def find_by_exact_name(name)
+        NetSuite::Records::InventoryItem.search({
+          criteria: {
+            basic: [{
+              field: 'displayName',
+              value: name,
+              operator: 'is'
+            }]
+          }
+        }).results.first
+      end
+
       def find_by_item_id(item_id)
         NetSuite::Records::InventoryItem.search({
           criteria: {
