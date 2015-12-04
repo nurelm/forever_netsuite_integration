@@ -5,9 +5,19 @@ module NetsuiteIntegration
 
       def find_by_external_id(email)
         NetSuite::Records::Customer.get(external_id: email)
-        # Silence the error
-        # We don't care that the record was not found
+
+      # Search on the customer email field if finding a customer record by
+      # external_id returns the NetSuite::RecordNotFound exception
       rescue NetSuite::RecordNotFound
+        NetSuite::Records::Customer.search({
+          basic: [
+            {
+              field: 'email',
+              operator: 'is',
+              value: email
+            }
+          ]
+        }).results.first
       end
 
       # entity_id -> Customer name
