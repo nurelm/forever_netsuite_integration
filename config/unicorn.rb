@@ -1,3 +1,6 @@
+@dir = File.expand_path(File.dirname(__FILE__))
+listen File.join(@dir, "../unicorn.sock"), :backlog => 1024
+
 # worker_processes 1 # NetSuite does not accept concurrency :(
 worker_processes ENV.fetch('WORKER_PROCESSES', 1).to_i
 
